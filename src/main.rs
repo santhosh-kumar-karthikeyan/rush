@@ -6,8 +6,8 @@ fn main() {
     print!("$ ");
     io::stdout().flush().unwrap();
     let mut command: String = String::new();
-    io::stdin()::read_line(&mut command).unwrap();
+    io::stdin().read_line(&mut command).unwrap();
     match command.trim() {
-        cmd => println!("{cmd}: command not found");
+        cmd => println!("{cmd}: command not found")
     }
 }
