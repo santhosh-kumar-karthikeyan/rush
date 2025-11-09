@@ -57,7 +57,7 @@ fn main() {
             Command::ExitCommand { status } => process::exit(i32::from(status)),
             Command::EchoCommand { display_string } => println!("{display_string}"),
             Command::TypeCommand { command } => println!("{command} is a shell builtin"),
-            Command::NotFound {command} => println!("{command}: command not found")
+            Command::NotFound {command} => println!("{command}: not found")
         }
     }
 }
