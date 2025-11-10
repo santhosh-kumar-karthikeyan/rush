@@ -1,47 +1,83 @@
+use std::fs;
 #[allow(unused_imports)]
 use std::io::{self, Write};
 use std::process;
+use std::env;
 
 enum Command {
     ExitCommand { status: u8 },
     EchoCommand { display_string: String},
-    TypeCommand { command: String},
+    TypeCommand { command: String, command_type: CommandType},
+    ExecCommand { command: String, location: String},
     NotFound { command: String}
+}
+
+enum CommandType {
+    Builtin,
+    Executable { location: String},
+    NotFound
 }
 
 impl Command {
     fn from_input(input: &str) -> Self {
-        let builtin_commands = ["echo", "type", "exit"];
         let parts: Vec<&str> = input.split_whitespace().collect();
-        if parts[0] == "exit" {
-            if parts.len() > 1 {
-                let status: u8 = parts[1].parse().unwrap();
-                Self::ExitCommand { status }
-            } else {
-                Self::ExitCommand { status: 0 }
-            }
-        } else if parts[0] == "echo" {
-            if parts.len() > 1 {
-                let command_str: String = parts[1..].join(" ");
-                Self::EchoCommand { display_string: command_str }
-            } else {
-                Self::EchoCommand { display_string: String::new() }
-            }
-        } else if parts[0] == "type" {
-            if parts.len() > 1 {
-                let test_command = parts[1];
-                if builtin_commands.contains(&test_command) {
-                    Self::TypeCommand { command: parts[1].to_string()}
+        let command_type = Self::get_command_type(parts[0]);
+        match command_type {
+            CommandType::NotFound => Self::NotFound { command: parts[0].to_string() },
+            CommandType::Builtin => Self::get_builtin_command(parts),
+            CommandType::Executable {location} => Self::ExecCommand { command: parts[0].to_string(), location }
+        }
+    }
+    fn get_builtin_command(parts: Vec<&str>) -> Self {
+        match parts[0] {
+            "exit" => {
+                if parts.len() > 1 {
+                    let status: u8 = parts[1].parse().unwrap();
+                    Self::ExitCommand { status }
                 } else {
-                    Self::NotFound { command: parts[1].to_string() }
+                    Self::ExitCommand { status: 0 }
                 }
-            } else {
-                Self::TypeCommand { command: "".to_string()}
+            },
+            "echo" => {
+                if parts.len() > 1 {
+                    let command_str: String = parts[1..].join(" ");
+                    Self::EchoCommand { display_string: command_str }
+                } else {
+                    Self::EchoCommand { display_string: String::new() }
+                }
+            },
+            "type" => {
+                if parts.len() == 1 {
+                    return Self::NotFound { command: String::new() };
+                }
+                let command_type = Self::get_command_type(parts[1]);
+                return Self::TypeCommand { command: parts[1].to_string(), command_type };
+            }
+            _ => {
+                Self::NotFound { command: String::from(parts[0]) }
             }
         }
-        else {
-            Self::NotFound { command: String::from(parts[0])}
+    }
+    fn get_command_type(command: &str) -> CommandType {
+        let builtins = ["echo", "type", "exit"];
+        if builtins.contains(&command) {
+            return CommandType::Builtin;
         }
+        let env_path = env::var("PATH").unwrap();
+        for dir in env::split_paths(&env_path) {
+            if !dir.is_dir() {
+                continue;
+            }
+            let Ok(entries) = fs::read_dir(&dir) else { continue };
+            for entry in entries {
+                let Ok(entry) = entry else { continue };
+                let exec = String::from(entry.file_name().to_string_lossy().to_owned());
+                if exec == command {
+                    return CommandType::Executable {location: dir.display().to_string()};
+                }
+            }
+        }
+        CommandType::NotFound
     }
 }
 
@@ -56,8 +92,15 @@ fn main() {
         match command {
             Command::ExitCommand { status } => process::exit(i32::from(status)),
             Command::EchoCommand { display_string } => println!("{display_string}"),
-            Command::TypeCommand { command } => println!("{command} is a shell builtin"),
-            Command::NotFound {command} => println!("{command}: not found")
+            Command::TypeCommand { command , command_type} => {
+                match command_type {
+                    CommandType::Builtin => println!("{command} is a shell builtin"),
+                    CommandType::Executable {location} => println!("{command} is {location}"),
+                    CommandType::NotFound => println!("{command}: not found")
+                }
+            },
+            Command::ExecCommand { command, location } => println!("{command} is {location}"),
+            Command::NotFound {command} => println!("{command}: command not found")
         }
     }
 }
