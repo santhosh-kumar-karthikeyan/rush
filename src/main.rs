@@ -10,6 +10,7 @@ enum Command {
     EchoCommand { display_string: String},
     TypeCommand { command: String, command_type: CommandType},
     ExecCommand,
+    PwdCommand { dir: String},
     NotFound { command: String}
 }
 
@@ -25,7 +26,7 @@ impl Command {
         let command_type = Self::get_command_type(parts[0]);
         match command_type {
             CommandType::NotFound => Self::NotFound { command: parts[0].to_string() },
-            CommandType::Builtin => Self::get_builtin_command(parts),
+            CommandType::Builtin => Self::exec_builtin_command(parts),
             CommandType::Executable {location} => {
                 let _ = location;
                 let mut command = process::Command::new(parts[0]);
@@ -37,7 +38,7 @@ impl Command {
             }
         }
     }
-    fn get_builtin_command(parts: Vec<&str>) -> Self {
+    fn exec_builtin_command(parts: Vec<&str>) -> Self {
         match parts[0] {
             "exit" => {
                 if parts.len() > 1 {
@@ -61,6 +62,10 @@ impl Command {
                 }
                 let command_type = Self::get_command_type(parts[1]);
                 return Self::TypeCommand { command: parts[1].to_string(), command_type };
+            }, 
+            "pwd" => {
+                let dir = env::current_dir().unwrap();
+                return Self::PwdCommand { dir: dir.display().to_string() };
             }
             _ => {
                 Self::NotFound { command: String::from(parts[0]) }
@@ -68,7 +73,7 @@ impl Command {
         }
     }
     fn get_command_type(command: &str) -> CommandType {
-        let builtins = ["echo", "type", "exit"];
+        let builtins = ["echo", "type", "exit", "pwd"];
         if builtins.contains(&command) {
             return CommandType::Builtin;
         }
@@ -113,7 +118,8 @@ fn main() {
                     CommandType::NotFound => println!("{command}: not found")
                 }
             },
-            Command::ExecCommand => {},
+            Command::PwdCommand { dir } => println!("{dir}"),
+            Command::ExecCommand => { },
             Command::NotFound {command} => println!("{command}: command not found")
         }
     }
