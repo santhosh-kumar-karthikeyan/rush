@@ -1,6 +1,7 @@
 use std::fs;
 #[allow(unused_imports)]
 use std::io::{self, Write};
+use std::os::unix::fs::PermissionsExt;
 use std::process;
 use std::env;
 
@@ -73,7 +74,12 @@ impl Command {
                 let Ok(entry) = entry else { continue };
                 let exec = String::from(entry.file_name().to_string_lossy().to_owned());
                 if exec == command {
-                    return CommandType::Executable {location: dir.display().to_string()};
+                    let metadata = fs::metadata(entry.path()).unwrap();
+                    let permissions = metadata.permissions();
+                    if permissions.mode() & 0o111 == 0 {
+                        continue;
+                    }
+                    return CommandType::Executable {location: entry.path().display().to_string()};
                 }
             }
         }
