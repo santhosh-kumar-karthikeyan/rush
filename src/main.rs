@@ -9,7 +9,7 @@ enum Command {
     ExitCommand { status: u8 },
     EchoCommand { display_string: String},
     TypeCommand { command: String, command_type: CommandType},
-    ExecCommand { command: String, location: String},
+    ExecCommand,
     NotFound { command: String}
 }
 
@@ -26,7 +26,15 @@ impl Command {
         match command_type {
             CommandType::NotFound => Self::NotFound { command: parts[0].to_string() },
             CommandType::Builtin => Self::get_builtin_command(parts),
-            CommandType::Executable {location} => Self::ExecCommand { command: parts[0].to_string(), location }
+            CommandType::Executable {location} => {
+                let _ = location;
+                let mut command = process::Command::new(parts[0]);
+                if parts.len() > 1 {
+                    command.args(parts[1..].iter());
+                }
+                command.status().unwrap();
+                Self::ExecCommand
+            }
         }
     }
     fn get_builtin_command(parts: Vec<&str>) -> Self {
@@ -105,7 +113,7 @@ fn main() {
                     CommandType::NotFound => println!("{command}: not found")
                 }
             },
-            Command::ExecCommand { command, location } => println!("{command} is {location}"),
+            Command::ExecCommand => {},
             Command::NotFound {command} => println!("{command}: command not found")
         }
     }
